@@ -1,0 +1,21 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+transforms3d = "*"
+ray = "*"
+mujoco = "*"
+scipy = "*"
+trimesh = "*"
+opencv-python = "*"
+triangle = "*"
+matplotlib = "*"
+open3d = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.8"
+python_full_version = "3.8.10"
