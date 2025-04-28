@@ -476,7 +476,7 @@ class Diffusion(LightningModule):
             raise ValueError('opt obj not supported')
         return objective
     
-    def compute_range_constraint_loss(self, x, lower_bound=0.0, upper_bound=16.0):
+    def compute_range_constraint_loss(self, x, lower_bound=0.0, upper_bound=16.5):
 
         violation_low = torch.relu(lower_bound - x)    # Penalize if x < 0
         violation_high = torch.relu(x - upper_bound)    # Penalize if x > 16
@@ -510,6 +510,7 @@ class Diffusion(LightningModule):
                     for i in range(0, batch_size*self.grid_size*self.num_pos**2, self.sub_batch_size):
                         logits = self.classifier_model(pts[i:i+self.sub_batch_size], sample_ori[i:i+self.sub_batch_size], sample_pos[i:i+self.sub_batch_size], timesteps[i:i+self.sub_batch_size].float() / self.noise_scheduler.config.num_train_timesteps, object_vertices=object_vertices_all[i:i+self.sub_batch_size])
                         log_probs = self.deltas_to_objective(logits, opt_obj, centers=convergence_centers)
+                        
                          # ➡️ 🆕 ADD constraint loss here in sub_batch:
                         constraint_loss = self.compute_range_constraint_loss(x)
                         total_loss = log_probs.sum() - 0.1 * constraint_loss
