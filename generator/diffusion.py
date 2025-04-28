@@ -475,6 +475,15 @@ class Diffusion(LightningModule):
         else:
             raise ValueError('opt obj not supported')
         return objective
+    
+    def compute_range_constraint_loss(self, x, lower_bound=0.0, upper_bound=16.0):
+
+        violation_low = torch.relu(lower_bound - x)    # Penalize if x < 0
+        violation_high = torch.relu(x - upper_bound)    # Penalize if x > 16
+        total_violation = violation_low + violation_high
+        return torch.mean(total_violation ** 2)
+    
+    
 
     def cond_fn(self, x, t, opt_obj='rotate', object_vertices=None, ori_range=[-1.0, 1.0], convergence_centers=None):
         self.clean_grad()
@@ -501,13 +510,22 @@ class Diffusion(LightningModule):
                     for i in range(0, batch_size*self.grid_size*self.num_pos**2, self.sub_batch_size):
                         logits = self.classifier_model(pts[i:i+self.sub_batch_size], sample_ori[i:i+self.sub_batch_size], sample_pos[i:i+self.sub_batch_size], timesteps[i:i+self.sub_batch_size].float() / self.noise_scheduler.config.num_train_timesteps, object_vertices=object_vertices_all[i:i+self.sub_batch_size])
                         log_probs = self.deltas_to_objective(logits, opt_obj, centers=convergence_centers)
+                         # ➡️ 🆕 ADD constraint loss here in sub_batch:
+                        constraint_loss = self.compute_range_constraint_loss(x)
+                        total_loss = log_probs.sum() - 0.1 * constraint_loss
+
                         grad += torch.autograd.grad(log_probs.sum(), x)[0]
                     return grad
                 logits = self.classifier_model(pts, sample_ori, sample_pos, timesteps.float() / self.noise_scheduler.config.num_train_timesteps, object_vertices=object_vertices_all)
             else:
                 raise ValueError('model type not supported')
             log_probs = self.deltas_to_objective(logits, opt_obj, centers=convergence_centers)
-            return torch.autograd.grad(log_probs.sum(), x)[0]
+
+            # ➡️ 🆕 ADD constraint loss for normal case:
+            constraint_loss = self.compute_range_constraint_loss(x)
+            total_loss = log_probs.sum() - 0.1 * constraint_loss    
+
+            return torch.autograd.grad(total_loss, x)[0]
 
     def get_convergence_centers(self, unguided_sample, object_vertices, batch_size, ori_range=[-1.0, 1.0]):
         # make a forward pass to get the profile
